@@ -105,7 +105,16 @@ class Button:
         
     
 
-
+#class Zone_Slice:
+#    def __init__(self,name,pos1,pos2,pos3,color):
+#        self.name = name
+#        self.pos1 = pos1
+#        self.pos2 = pos2
+#        self.pos3 = pos3
+#        self.color = color
+#    
+#    def draw(self):
+#        pygame.draw.polygon(screen,self.color,(self.pos1,self.pos2,self.pos3),0)
    
 class Zone:
     def __init__(self, num, pos, radius, color):
@@ -117,6 +126,20 @@ class Zone:
         
     def draw(self):
         pygame.draw.circle( *self.rect )  
+
+#class Base(Zone):
+#    def __init__(self, num, pos, radius, color, combatant):
+#        super().__init__( num, pos, radius, color)
+#        self.combatant = combatant
+#        self.points_banked = 0
+#        
+#    def bank_points(self,combatant):
+#        if combatant.name = combatant
+#        
+#    def draw(self):
+#        pygame.draw.circle( *self.rect ) 
+##        screen.blit(pygame.font.Font(None,16).render(str(self.points_carried), True, pygame.Color('white')) ,self.pos) #hardcoded font size
+
 
 class Blocker:
     def __init__(self,pos,width,height,fired_by,pos_fired_by):
@@ -137,36 +160,30 @@ class Blocker:
         if direction=='Down':
             self.width = max(0,self.width - self.width_change*self.original_width)
         if direction == 'Up':
-            self.width = min(self.width_max,self.width + self.width_change*self.original_widths)
-
-            
-    
-#    def polygon(self):
-#        pos1 = add_pos(self.pos, new_pos(self.rads,self.width/2) ) #bottom left
-#        pos2 = add_pos(pos1, new_pos(self.rads+math.pi,self.width)) #bottom right
-#        pos3 = add_pos(pos2, new_pos(self.rads+(math.pi*1.5),self.height) ) #top right
-#        pos4 = add_pos(pos3, new_pos(self.rads,self.width) ) #top left
-#        return [ pos1,pos2,pos3,pos4]
+            self.width = min(self.width_max,self.width + self.width_change*self.original_width)
+        if self.width <= self.original_width*.01:
+            self.visible = False
     
     def rect(self):
-        return pygame.Rect( self.pos[0], self.pos[1], self.width,self.height )
+        return pygame.Rect( self.pos[0]-self.width/2, self.pos[1], self.width,self.height )
         
     def draw(self):
         return pygame.draw.rect(screen, RED, self.rect() )
 
 class Projectile:
-    def __init__(self,pos,pos_end,fired_by):
+    def __init__(self,pos,pos_end,fired_by,color):
         self.pos = pos
         self.pos_start = pos
         self.pos_end = pos_end
-        self.width = 3 #hardcode not scaled
+        self.color = color
+        self.width = 5 #hardcode not scaled
         
-        self.height = 3 #hardcode not scaled
+        self.height = 5 #hardcode not scaled
         self.speed = 2 #hardcode not scaled
         self.fired_by = fired_by
         self.phase = 1
-        self.phase_max = 30
-        self.boom_radius = 10
+        self.phase_max = 20
+        self.boom_radius = 5
         
         self.vector_full = vector_full(self.pos_start,self.pos_end)
 #       self.vector_full =  ( (self.pos_end[0]-self.pos_start[0])*-1 ,self.pos_end[1]-self.pos_start[1]) #pygame flips y axis
@@ -185,23 +202,28 @@ class Projectile:
     def rect(self):
         return pygame.Rect( self.pos[0], self.pos[1], self.width,self.height )
     
+    def destroy(self):
+        self.speed = 0 
+        self.visible = False
+    
     def draw(self):
         if self.visible == True:
-            if in_zone(self.center()).num<=4:
-                return pygame.draw.rect(screen, BLACK , self.rect() )  
+            if in_zone(self.center()).num<=3:
+                return pygame.draw.rect(screen, self.color , self.rect() )  
             else:
                 self.speed = 0 
                 if self.phase>=self.phase_max:
                     self.visible=False
                 else:
-                    pygame.draw.circle(screen, BLACK , self.center(), self.boom_radius ) 
+                    pygame.draw.circle(screen, RED , self.center(), self.boom_radius ) 
                     self.phase += 1
 
 
 
 class Combatant(object):
-    def __init__(self, name, pos, vector,color,width,height):
+    def __init__(self, name, c_type, pos, vector,color,width,height):
         self.name = name
+        self.c_type = c_type
         self.pos = pos
         self.vector = vector
 #        self.image = pygame.image.load("p3_front.png")
@@ -209,13 +231,19 @@ class Combatant(object):
         self.color = color
         self.width = width
         self.height = height
+        self.pos_spawn = pos
+        self.base_radius = 40
         self.aim_pos = None
         self.friction = .995
-        self.mode = 'Block'
-        self.wait_attack = 30
+        self.mode = 'Attack'
+        self.wait_attack = 60
         self.timer_attack = 0
-        self.wait_block = 30
+        self.wait_block = 60
         self.timer_block = 0
+        self.points_carried = 0
+        self.points_banked = 0
+        self.base_attack_box = pygame.Rect(self.pos_spawn[0]-self.base_radius*.65, self.pos_spawn[1], self.width, self.height)
+        self.base_block_box = pygame.Rect(self.pos_spawn[0]+self.base_radius*.65, self.pos_spawn[1], self.width, self.height)
         
     def center(self):
         return (self.pos[0]+self.width/2, self.pos[1]+self.height/2)
@@ -224,46 +252,75 @@ class Combatant(object):
         return pygame.Rect(self.pos[0], self.pos[1], self.width, self.height)
         
     def draw(self):
+        #base
+        pygame.draw.circle(screen,WHITE,self.pos_spawn,40) #harssdcode
+        #sprite
         pygame.draw.rect(screen, self.color , self.rect())  
+        screen.blit(pygame.font.Font(None,16).render(str(self.points_carried), True, BLACK) ,self.pos) #hardcoded font size
+        screen.blit(pygame.font.Font(None,16).render(str(self.points_banked), True, BLACK) ,add_pos(self.pos_spawn,(0,self.base_radius*.65)) ) #hardcoded font size
+
+        pygame.draw.rect(screen, BLUE , self.base_attack_box)  
+        pygame.draw.rect(screen, ORANGE , self.base_block_box)  
         
     def update_pos(self):
         self.pos = tuple(map(operator.add, self.pos, self.vector))
     
     # this ends the game if you die
     def check_death(self):
-        if in_zone(self.center()).num == 5:
+        if in_zone(self.center()).num == 4:
             self.color = RED
             return True
+        
+    def aim(self,target):
+        if self.c_type == 'Computer':
+            self.aim_pos = target.pos
+        else:
+            self.aim_pos = mouse_pos
+    
+    def fire_criteria_combatants(self):
+        timer=False
+        if self.mode == 'Attack':
+            if self.timer_attack >= self.wait_attack:
+                timer=True
+        if self.mode == 'Block':
+            if self.timer_block >= self.wait_block:
+                timer=True
+        self.timer_attack = self.timer_attack+1
+        self.timer_block = self.timer_block+1
+        return all([in_zone(self.center()).num == 3 , timer])
+    
+    def fire(self):
+        if self.fire_criteria_combatants() ==True and self.fire_criteria_subclass()==True:
+            self.aim(Combatant1) # hardcode, build strategy later for multiple players, highest score is target of all AI
+            if self.mode == 'Attack':
+                projectiles.append(Projectile(self.center(),self.aim_pos,self.name,self.color))
+                self.timer_attack = 0
+            if self.mode == 'Block':
+                blockers.append(Blocker(self.aim_pos,self.base_radius,4,self.name,self.center()))#hardcode blocker size
+                self.timer_block = 0
+                
+    def points_add(self):
+        if in_zone(self.center()).num==1:
+            self.points_carried = self.points_carried + 1
+        if distance_between(self.center(), self.pos_spawn)<=self.base_radius:
+            self.points_banked = self.points_banked+self.points_carried
+            self.points_carried=0
+
 
 class Computer(Combatant):
-    def __init__(self, name, pos, vector,color,width,height):
-        super().__init__( name, pos, vector,color,width,height)
+    def __init__(self, name, c_type, pos, vector,color,width,height):
+        super().__init__( name, c_type, pos, vector,color,width,height)
     
     def update_vector(self):
         pass
-#        if pressed[pygame.K_w]: w=-.02 
-#        else: w=0
-#        if pressed[pygame.K_a]: a=-.02
-#        else: a=0
-#        if pressed[pygame.K_s]: s=.02
-#        else: s=0
-#        if pressed[pygame.K_d]: d=.02
-#        else: d=0
-#        ws = w+s
-#        ad = a+d
-#        self.vector = (self.vector[0]+ad,self.vector[1]+ws)
-        
-    def aim(self,target):
-        self.aim_pos = target.pos
-        
-    def fire(self):
-        if in_zone(self.center()).num == 4:
-            self.aim(Combatant1)
-            projectiles.append(Projectile(self.pos,self.aim_pos,self.name))    
 
+    def fire_criteria_subclass(self):
+        return True
+        
+    
 class Human(Combatant):
-    def __init__(self, name, pos, vector,color,width,height):
-        super().__init__( name, pos, vector,color,width,height)
+    def __init__(self, name, c_type, pos, vector,color,width,height):
+        super().__init__( name, c_type, pos, vector,color,width,height)
     
     def update_vector(self):
         if pressed[pygame.K_w]: w=-.02 
@@ -279,25 +336,15 @@ class Human(Combatant):
         self.vector = ((self.vector[0]+ad)*self.friction,(self.vector[1]+ws)*self.friction)
     
     def mode_toggle(self):
-        if SPACEDOWN==True:
-            if self.mode == 'Block': self.mode = 'Attack'
-            else: self.mode = 'Block'
-    
-    def aim(self):
-        self.aim_pos = mouse_pos
-        
-    def fire(self):
-        print('Firing')
-        if click==True and in_zone(self.center()).num == 4:
-            self.aim()
-            if self.mode == 'Attack' and self.timer_attack>=self.wait_attack:
-                projectiles.append(Projectile(self.center(),self.aim_pos,self.name))
-                self.timer_attack = 0
-            elif self.mode == 'Block' and self.timer_block>=self.wait_block:
-                blockers.append(Blocker(self.aim_pos,20,1,self.name,self.center()))
-                self.timer_block = 0
-        self.timer_attack = self.timer_attack+1
-        self.timer_block = self.timer_block+1
+        if SPACEDOWN==True and self.mode == 'Block':
+            self.mode = 'Attack'
+        elif SPACEDOWN==True and self.mode == 'Attack':
+            self.mode = 'Block'
+            
+            
+    def fire_criteria_subclass(self):
+        return all([click==True])
+
                 
 #create instance of screen
 screen1 = Screen(1000,800)
@@ -317,21 +364,24 @@ done = False
 
 
 #create arena
-Zone1 = Zone( 1,(screen1.center),20,RED )
-Zone2 = Zone( 2,(screen1.center),60,ORANGE )
-Zone3 = Zone( 3,(screen1.center),150,YELLOW )
-Zone4 = Zone( 4,(screen1.center),300,GREEN )
-Zone5 = Zone( 5,(screen1.center),310,WHITE )
-Zone6 = Zone( 6,(screen1.center),1000,BLACK ) #created for development, to prevent a Combatant from never bing in a zone
+Zone1 = Zone( 1,(screen1.center),30,RED )
+Zone2 = Zone( 2,(screen1.center),150,YELLOW )
+Zone3 = Zone( 3,(screen1.center),300,GREEN )
+Zone4 = Zone( 4,(screen1.center),310,WHITE )
+Zone5 = Zone( 5,(screen1.center),1000,BLACK ) #created for development, to prevent a Combatant from never bing in a zone
 
-Zones = [Zone6,Zone5,Zone4,Zone3,Zone2,Zone1]
+#toggle_attack1 = Zone_Slice('Toggle_Attack',screen1.center,(screen1.width_center,screen1.height_center+1000),(screen1.width_center+30,screen1.height_center+1000),ORANGE)
 
-spawn_human = (Zone4.pos[0],Zone4.pos[1]+ ((Zone3.radius+Zone4.radius)/2) )
-spawn_computer = (Zone4.pos[0],Zone4.pos[1]- ((Zone3.radius+Zone4.radius)/2) )
+Zones = [Zone5,Zone4,Zone3,Zone2,Zone1]
+
+
+spawn_human = (Zone3.pos[0],int(Zone3.pos[1]+ (Zone3.radius*.90)))
+spawn_computer = (Zone3.pos[0],int(Zone3.pos[1]- (Zone3.radius*.90)))
+
 
 #create Combatants
-Combatant1 = Human('Read',spawn_human,(0,0),BLUE,10,10)#
-Combatant2 = Computer('Computer',spawn_computer,(0,0),TEAL,10,10)#
+Combatant1 = Human('Read','Human',spawn_human,(0,0),BLUE,14,14)#hardcode
+Combatant2 = Computer('Hal','Computer',spawn_computer,(0,0),TEAL,14,14)#hardcode
 
 combatants=[Combatant1,Combatant2]
 
@@ -343,10 +393,12 @@ pygame.mouse.set_visible(True)
 pygame.mouse.set_cursor(*pygame.cursors.broken_x)
 
 
+# create needed variables
+SPACEDOWN=False
+
 # -------- Main Program Loop -----------
 while not done:
     # --- Event Processing
-    SPACEDOWN=False
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             done = True
@@ -370,19 +422,21 @@ while not done:
     #draw all the zones
     [zone.draw() for zone in Zones]
     
-    # draw all projectiles/blockers in current positions
-    [projectile.draw() for projectile in projectiles]
-    [blocker.draw() for blocker in blockers]
+
     
     #draw Combatant on screen
     [combatant.draw() for combatant in combatants]
-    [combatant.fire() for combatant in combatants]
-
+    
+    # draw all projectiles/blockers in current positions
+    [projectile.draw() for projectile in projectiles]
+    [blocker.draw() for blocker in blockers]
 
     # --- Update info after drawing
-    #update vector using key inputs and then update position
+    #update vector using key inputs and then update position  
+    [combatant.fire() for combatant in combatants]
     [combatant.update_vector() for combatant in combatants]
     [combatant.update_pos() for combatant in combatants]
+    [combatant.points_add() for combatant in combatants]
     Combatant1.mode_toggle() 
     
     #end game on death
@@ -390,32 +444,56 @@ while not done:
     
     #check for projectile collisions
     for projectile in projectiles:
-        for combatant in combatants:
-            if projectile.rect().colliderect(combatant.rect())==True:
-                #destroy projectile
-                projectile.speed = 0
-                projectile.visible=False
-                
-#                #relocate player to start pos in base
-#                if combatant.name=='Read': #hardcode, fix this section later
-#                    combatant.pos = spawn_human
-#                else:
-#                    combatant.pos = spawn_computer
+        for combatant in combatants :
+            if distance_between(projectile.pos,combatant.pos)<=(combatant.width+combatant.height):
+                if projectile.rect().colliderect(combatant.rect())==True and projectile.fired_by!=combatant.name:
+                    #destroy projectile
+                    projectile.speed = 0
+                    projectile.visible=False
+                    
+                    # remove all points and relocate player to start pos in base
+                    combatant.points_carried = 0
+                    combatant.pos = combatant.pos_spawn
+                    
+            #check if projectile collided with attack/block toggle boxes
+            if distance_between(projectile.pos,combatant.pos_spawn)<=(combatant.base_radius):
+                if projectile.fired_by==combatant.name:
+                    if projectile.rect().colliderect(combatant.base_attack_box)==True :
+                        #destroy projectile and change mode to attack
+                        projectile.destroy()
+                        combatant.mode = 'Attack'
+                else:
+                    projectile.destroy()
+            if distance_between(projectile.pos,combatant.pos_spawn)<=(combatant.base_radius):
+                if projectile.fired_by==combatant.name:
+                    if projectile.rect().colliderect(combatant.base_block_box)==True :
+                        #destroy projectile and change mode to attack
+                        projectile.destroy()
+                        combatant.mode = 'Block'
+                else:
+                    projectile.destroy()
+                    
+
                 
         for blocker in blockers:
-            if projectile.rect().colliderect(blocker.rect())==True:
-                #destroy projectile
-                projectile.speed = 0
-                projectile.visible=False
-                
-                # change blocker size
-                if blocker.fired_by==projectile.fired_by:
-                    blocker.change_size('Up')
-                else:
-                    blocker.change_size('Down')
+            if distance_between(projectile.pos,blocker.pos)<=(blocker.width+blocker.height):
+                if projectile.rect().colliderect(blocker.rect())==True:
+                    #destroy projectile
+                    projectile.speed = 0
+                    projectile.visible=False
                     
-    #delete invisible projectiles 
+                    # change blocker size
+                    if blocker.fired_by==projectile.fired_by:
+                        blocker.change_size('Up')
+                    else:
+                        blocker.change_size('Down')
+                        
+
+                    
+    #delete invisible projectiles and blockers 
     [projectiles.remove(projectile) for projectile in projectiles if projectile.visible==False ]
+    [blockers.remove(blocker) for blocker in blockers if blocker.visible==False ]
+    
     #update all projectiles positions
     [projectile.update_pos() for projectile in projectiles]
     
