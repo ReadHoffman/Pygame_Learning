@@ -4,8 +4,9 @@ Created on Fri Jul 31 19:03:36 2020
 
 @author: Read
 
-future enhancements
--
+todo
+- fix random blocker spawning in enemy base
+- make blockers a projectile deployment and then still able to shoot at really slow rate
 
 """
 
@@ -171,11 +172,12 @@ class Blocker:
         return pygame.draw.rect(screen, RED, self.rect() )
 
 class Projectile:
-    def __init__(self,pos,pos_end,fired_by,color):
+    def __init__(self,pos,pos_end,fired_by,color,mode):
         self.pos = pos
         self.pos_start = pos
         self.pos_end = pos_end
         self.color = color
+        self.mode = mode
         self.width = 5 #hardcode not scaled
         
         self.height = 5 #hardcode not scaled
@@ -208,15 +210,29 @@ class Projectile:
     
     def draw(self):
         if self.visible == True:
-            if in_zone(self.center()).num<=3:
-                return pygame.draw.rect(screen, self.color , self.rect() )  
-            else:
-                self.speed = 0 
-                if self.phase>=self.phase_max:
-                    self.visible=False
+            if self.mode=='Attack':
+                if in_zone(self.center()).num<=3:
+                    return pygame.draw.rect(screen, self.color , self.rect() )  
                 else:
-                    pygame.draw.circle(screen, RED , self.center(), self.boom_radius ) 
-                    self.phase += 1
+                    self.speed = 0 
+                    if self.phase>=self.phase_max:
+                        self.visible=False
+                    else:
+                        pygame.draw.circle(screen, RED , self.center(), self.boom_radius ) 
+                        self.phase += 1
+            if self.mode == 'Block':
+                if distance_between(self.pos,self.pos_end)<=self.width:
+                    blockers.append(Blocker(self.pos_end,40,4,self.fired_by,self.pos_start)) #hardcode width height
+                    self.destroy()
+                elif in_zone(self.center()).num<=3:
+                    return pygame.draw.rect(screen, self.color , self.rect() )  
+                else:
+                    self.speed = 0 
+                    if self.phase>=self.phase_max:
+                        self.visible=False
+                    else:
+                        pygame.draw.circle(screen, RED , self.center(), self.boom_radius ) 
+                        self.phase += 1
 
 
 
@@ -236,9 +252,9 @@ class Combatant(object):
         self.aim_pos = None
         self.friction = .995
         self.mode = 'Attack'
-        self.wait_attack = 60
+        self.wait_attack = 30
         self.timer_attack = 0
-        self.wait_block = 60
+        self.wait_block = 120
         self.timer_block = 0
         self.points_carried = 0
         self.points_banked = 0
@@ -292,12 +308,16 @@ class Combatant(object):
     def fire(self):
         if self.fire_criteria_combatants() ==True and self.fire_criteria_subclass()==True:
             self.aim(Combatant1) # hardcode, build strategy later for multiple players, highest score is target of all AI
-            if self.mode == 'Attack':
-                projectiles.append(Projectile(self.center(),self.aim_pos,self.name,self.color))
-                self.timer_attack = 0
-            if self.mode == 'Block':
-                blockers.append(Blocker(self.aim_pos,self.base_radius,4,self.name,self.center()))#hardcode blocker size
-                self.timer_block = 0
+            projectiles.append(Projectile(self.center(),self.aim_pos,self.name,self.color,self.mode))
+            self.timer_attack = 0
+            self.timer_block = 0
+            
+#            if self.mode == 'Attack':
+#                projectiles.append(Projectile(self.center(),self.aim_pos,self.name,self.color),self.mode)
+#                self.timer_attack = 0
+#            if self.mode == 'Block':
+#                blockers.append(Blocker(self.aim_pos,self.base_radius,4,self.name,self.center()),self.mode)#hardcode blocker size
+#                self.timer_block = 0
                 
     def points_add(self):
         if in_zone(self.center()).num==1:
