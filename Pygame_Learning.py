@@ -12,7 +12,6 @@ todo
 
 
 
-
 import pygame
 from pygame.locals import KEYDOWN
 import math
